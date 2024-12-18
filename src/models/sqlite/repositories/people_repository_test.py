@@ -10,8 +10,10 @@ class MockConnection:
         self.session = UnifiedAlchemyMagicMock(
             data=[
                 (
-                    [mock.call.add(PeopleTable)], #query
-                    [] #resultado
+                    [mock.call.add(PeopleTable), mock.call.query(PeopleTable)], #query
+                    [
+                        PeopleTable(first_name="first name", last_name="last name", age=24, pet_id=1)
+                    ] #resultado
                 )
             ]
         )
@@ -23,6 +25,7 @@ class MockConnectionNoResult:
     def __init__(self):
         self.session = UnifiedAlchemyMagicMock()
         self.session.add.side_effect = self.__raise_no_result_found
+        self.session.query.side_effect = self.__raise_no_result_found
 
     def __raise_no_result_found(self, *args, **kwargs):
         raise NoResultFound("No result found")
@@ -57,3 +60,20 @@ def test_insert_person_error():
         repo.insert_person(first_name, last_name, age, pet_id)
 
     mock_connection.session.rollback.assert_called_once()
+
+def test_get_person():
+    mock_connection = MockConnection()
+    repo = PeopleRepository(mock_connection)
+
+    repo.get_person(1)
+
+    mock_connection.session.query.assert_called_once_with(PeopleTable)
+    mock_connection.session.outerjoin.assert_called_once()
+
+def test_get_person_error():
+    mock_connection = MockConnectionNoResult()
+    repo = PeopleRepository(mock_connection)
+
+    response = repo.get_person(1)
+
+    assert response is None
